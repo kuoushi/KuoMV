@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.151
+// Version: 0.20
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.15 Replace level progression with stat-based progression.
+ * @plugindesc v0.20 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Default HP Growth Max
@@ -109,6 +109,10 @@ Compat.BE = Compat.BE || {};
  * @desc The default chance to increase LUK after battle. (1-100)
  * @default 25
  *
+ * @param Base Skill Growth Rate
+ * @desc The default amount added to a character's base growth rate per skill use. (0-100)
+ * @default 0
+ *
  * @help
  * ============================================================================
  * Introduction
@@ -124,6 +128,16 @@ Compat.BE = Compat.BE || {};
  * ============================================================================
  * Changelog
  * ============================================================================
+ *
+ * 0.20  Skills can now give an increased chance of gaining specific stats
+ *       when they are used in battle. New default parameter added to let 
+ *       users set the base increase for all skills (0 for none, 100 for 
+ *       certain skill increase.) Skill notetags are required at the moment
+ *       for each skill unless you want them all to have the base gain chance.
+ *       <GrowStats: 1,2,3,4,5,6,7,8> is the current format. All numbers are
+ *       currently required in order for this to work, and each number can be
+ *       from 0 to 100. They correspond to the basic stats (Max HP, Max MP, ATK,
+ *       DEF, MAT, MDF, AGI, LUK).
  *
  * 0.151 Some code cleanup. Only some though.
  *
@@ -151,7 +165,9 @@ Compat.BE = Compat.BE || {};
     Compat.Parameters = PluginManager.parameters('StatProg');
     Compat.Param = Compat.Param || {};
     Compat.gparam = Compat.gparam || {};
-    Compat.gparam = Compat.aparam || {};
+    Compat.skillparam = [];
+    Compat.gparamPlus = []; //Compat.gparamPlus || {};
+    Compat.aparam = Compat.aparam || {};
     var stats      = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
     var statsShort = [ "hp", "mp", "atk", "def", "mat", "mdf", "agi", "luk" ];
 
@@ -182,6 +198,7 @@ Compat.BE = Compat.BE || {};
     Compat.Param.Growth['lukgmax'] = Number(Compat.Parameters['Default LUK Growth Max']);
     Compat.Param.Growth['lukgmin'] = Number(Compat.Parameters['Default LUK Growth Min']);
     Compat.Param.Growth['lukgr']   = Number(Compat.Parameters['Default LUK Growth Rate']) / 100;
+    Compat.Param.SkillGrowthRate   = Number(Compat.Parameters['Base Skill Growth Rate']);
 
 //=============================================================================
 // DataManager
@@ -193,13 +210,27 @@ Compat.BE = Compat.BE || {};
         if(data.classId) {
             Compat.gparam[data.id] = Compat.gparam[data.id] || {};
             Compat.gparam[data.id] = MVC.deepClone(Compat.Param.Growth);
+            Compat.gparamPlus[data.id] = [ 0,0,0,0,0,0,0,0 ];
 
-            for(var a in data.meta) {
+            for(var a in data.meta) {  // only actors
                 var b = parseInt(data.meta[a]);
                 if(a.toUpperCase().indexOf("GR") > -1) {
                     b /= 100;
                 }
                 Compat.gparam[data.id][a] = b;
+            }
+        }
+        else if ((data.speed || data.speed == 0) && (data.message1 || data.message1 == "")) { // only skills
+            Compat.skillparam[data.id] = [];
+            
+            for(var k = 0; k < stats.length; k++) {
+                Compat.skillparam[data.id][k] = Compat.Param.SkillGrowthRate;
+            }
+            if(data.meta["GrowStats"]) {
+                var x = data.meta["GrowStats"].split(",");
+                for(var i = 0; i < x.length; i++) {
+                    Compat.skillparam[data.id][i] = parseInt(x[i]);
+                }
             }
         }
     };
@@ -220,7 +251,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._hpGrowthRate = function() {
-        return Compat.gparam[this._actorId]["hpgr"];
+        return Compat.gparam[this._actorId]["hpgr"] + Compat.gparamPlus[this._actorId][0];
     }
 
     //growth and min/max stats for MP
@@ -235,7 +266,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._mpGrowthRate = function() {
-        return Compat.gparam[this._actorId]["mpgr"];
+        return Compat.gparam[this._actorId]["mpgr"] + Compat.gparamPlus[this._actorId][1];
     }
 
     //growth and min/max stats for ATK
@@ -250,7 +281,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._atkGrowthRate = function() {
-        return Compat.gparam[this._actorId]["atkgr"];
+        return Compat.gparam[this._actorId]["atkgr"] + Compat.gparamPlus[this._actorId][2];
     }
 
     //growth and min/max stats for DEF
@@ -265,7 +296,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._defGrowthRate = function() {
-        return Compat.gparam[this._actorId]["defgr"];
+        return Compat.gparam[this._actorId]["defgr"] + Compat.gparamPlus[this._actorId][3];
     }
 
     //growth and min/max stats for MAT
@@ -280,7 +311,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._matGrowthRate = function() {
-        return Compat.gparam[this._actorId]["matgr"];
+        return Compat.gparam[this._actorId]["matgr"] + Compat.gparamPlus[this._actorId][4];
     }
 
     //growth and min/max stats for MDF
@@ -295,7 +326,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._mdfGrowthRate = function() {
-        return Compat.gparam[this._actorId]["mdfgr"];
+        return Compat.gparam[this._actorId]["mdfgr"] + Compat.gparamPlus[this._actorId][5];
     }
 
     //growth and min/max stats for AGI
@@ -310,7 +341,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._agiGrowthRate = function() {
-        return Compat.gparam[this._actorId]["agigr"];
+        return Compat.gparam[this._actorId]["agigr"] + Compat.gparamPlus[this._actorId][6];
     }
 
     //growth and min/max stats for LUK
@@ -325,7 +356,7 @@ Compat.BE = Compat.BE || {};
     });
 
     Game_BattlerBase.prototype._lukGrowthRate = function() {
-        return Compat.gparam[this._actorId]["lukgr"];
+        return Compat.gparam[this._actorId]["lukgr"] + Compat.gparamPlus[this._actorId][7];
     }
     
     Game_BattlerBase.prototype.getRates = function(paramId) {
@@ -333,13 +364,17 @@ Compat.BE = Compat.BE || {};
         if(paramId >= 0 && paramId < 8) {
             var statKey = String(statsShort[paramId])
             var key = statKey + "gr";
-            growth[0] = Compat.gparam[this._actorId][key];
+            growth[0] = Compat.gparam[this._actorId][key] + Compat.gparamPlus[this._actorId][paramId];
             var key = statKey + "gmax";
             growth[1] = Compat.gparam[this._actorId][key];
             var key = statKey + "gmin";
             growth[2] = Compat.gparam[this._actorId][key];
         }
         return growth;
+    }
+    
+    Game_BattlerBase.prototype.clearGParamPlus = function() {
+        Compat.gparamPlus[this._actorId] = [ 0,0,0,0,0,0,0,0 ];
     }
 
 //=============================================================================
@@ -374,7 +409,26 @@ Compat.BE = Compat.BE || {};
                     actor.addParam(a,Compat.aparam[actor._actorId][a]);
                 }
             }
+            actor.clearGParamPlus();
         }, this);
+    };
+    
+
+//=============================================================================
+// Game_Action
+//=============================================================================
+
+    Compat.BE.Game_Action_apply = Game_Action.prototype.apply;
+    Game_Action.prototype.apply = function(target) {
+        Compat.BE.Game_Action_apply.call(this, target);
+        var subject = this.subject();
+        if(subject._classId >= 0) {
+            var attackSkill = this._item.itemId();
+
+            for(var i = 0; i < stats.length; i++) {
+                Compat.gparamPlus[subject._actorId][i] += (Compat.skillparam[attackSkill][i] / 100);
+            }
+        }
     };
 
 //=============================================================================
