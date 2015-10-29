@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.15
+// Version: 0.151
 // Author: Kuoushi
 //=============================================================================
 
@@ -125,16 +125,19 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
- * 0.10 Released extremely early alpha. Stats will raise based on parameter
- *      values that can be set through plugin parameters or in the actor's
- *      notetags. Presently the gains are not based on any specific skill
- *      usage but on a random chance as defined through plugin parameters.
- *      The leveling system is also still in place with references to it in
- *      windows and everything. This can currently be counteracted by setting
- *      enemy experience gains to 0.
- * 0.15 Added extremely early support of YEP_VictoryAftermath. Presently it
- *      will just replace the current EXP screen until I can figure out how
- *      to make it do a custom screen. It's also ugly.
+ * 0.151 Some code cleanup. Only some though.
+ *
+ * 0.15  Added extremely early support of YEP_VictoryAftermath. Presently it
+ *       will just replace the current EXP screen until I can figure out how
+ *       to make it do a custom screen. It's also ugly.
+ *
+ * 0.10  Released extremely early alpha. Stats will raise based on parameter
+ *       values that can be set through plugin parameters or in the actor's
+ *       notetags. Presently the gains are not based on any specific skill
+ *       usage but on a random chance as defined through plugin parameters.
+ *       The leveling system is also still in place with references to it in
+ *       windows and everything. This can currently be counteracted by setting
+ *       enemy experience gains to 0.
  */
 //=============================================================================
 
@@ -149,6 +152,8 @@ Compat.BE = Compat.BE || {};
     Compat.Param = Compat.Param || {};
     Compat.gparam = Compat.gparam || {};
     Compat.gparam = Compat.aparam || {};
+    var stats      = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
+    var statsShort = [ "hp", "mp", "atk", "def", "mat", "mdf", "agi", "luk" ];
 
     //Compat.Param. = String(Compat.Parameters['']);
     Compat.Param.Growth = Compat.Param.Growth || {};
@@ -322,6 +327,20 @@ Compat.BE = Compat.BE || {};
     Game_BattlerBase.prototype._lukGrowthRate = function() {
         return Compat.gparam[this._actorId]["lukgr"];
     }
+    
+    Game_BattlerBase.prototype.getRates = function(paramId) {
+        var growth = [];
+        if(paramId >= 0 && paramId < 8) {
+            var statKey = String(statsShort[paramId])
+            var key = statKey + "gr";
+            growth[0] = Compat.gparam[this._actorId][key];
+            var key = statKey + "gmax";
+            growth[1] = Compat.gparam[this._actorId][key];
+            var key = statKey + "gmin";
+            growth[2] = Compat.gparam[this._actorId][key];
+        }
+        return growth;
+    }
 
 //=============================================================================
 // BattleManager
@@ -333,46 +352,14 @@ Compat.BE = Compat.BE || {};
         Compat.aparam = undefined;
         Compat.aparam = Compat.aparam || {};
         $gameParty.battleMembers().forEach(function(actor) {
-            Compat.aparam[actor._actorId] = Compat.aparam[actor._actorId] || {};
+            Compat.aparam[actor._actorId] = []; //Compat.aparam[actor._actorId] || {};
 
-            if(actor.hpgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.hpgmax - actor.hpgmin + 1) + actor.hpgmin);
-                Compat.aparam[actor._actorId][0] = inc;
-            }
-
-            if(actor.mpgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.mpgmax - actor.mpgmin + 1) + actor.mpgmin);
-                Compat.aparam[actor._actorId][1] = inc;
-            }
-
-            if(actor.atkgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.atkgmax - actor.atkgmin + 1) + actor.atkgmin);
-                Compat.aparam[actor._actorId][2] = inc;
-            }
-
-            if(actor.defgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.defgmax - actor.defgmin + 1) + actor.defgmin);
-                Compat.aparam[actor._actorId][3] = inc;
-            }
-
-            if(actor.matgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.matgmax - actor.matgmin + 1) + actor.matgmin);
-                Compat.aparam[actor._actorId][4] = inc;
-            }
-
-            if(actor.mdfgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.mdfgmax - actor.mdfgmin + 1) + actor.mdfgmin);
-                Compat.aparam[actor._actorId][5] = inc;
-            }
-
-            if(actor.agigr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.agigmax - actor.agigmin + 1) + actor.agigmin);
-                Compat.aparam[actor._actorId][6] = inc;
-            }
-
-            if(actor.lukgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.lukgmax - actor.lukgmin + 1) + actor.lukgmin);
-                Compat.aparam[actor._actorId][7] = inc;
+            for(var i = 0; i < 8; i++) {
+                var growthRates = actor.getRates(i);
+                if(growthRates[0] > Math.random()) {
+                    var inc = Math.floor(Math.random() * (growthRates[1] - growthRates[2] + 1) + growthRates[2]);
+                    Compat.aparam[actor._actorId][i] = inc;
+                }
             }
 
         }, this);
@@ -404,7 +391,6 @@ Compat.BE = Compat.BE || {};
         };
 
         Window_VictoryExp.prototype.drawStats = function(actor, rect) {
-            var stats = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
             var yOffset = 0;
             var xOffset = 128;
             for(var i = 0; i < 8; i++) {
