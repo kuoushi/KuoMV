@@ -1,7 +1,8 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.10
+// Version: 0.15
+// Author: Kuoushi
 //=============================================================================
 
 var Compat = Compat || {};
@@ -9,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc Replace level progression with stat-based progression.
+ * @plugindesc v0.15 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Default HP Growth Max
@@ -116,7 +117,7 @@ Compat.BE = Compat.BE || {};
  * This plugin replaces the current leveling system with a stat-based
  * progression system where characters gain stats based on what actions they
  * use in battle, rather than based on levels and experience.
- * 
+ *
  * This plugin requires MVCommons.js to work and as far as I'm aware does not
  * break or clash with most plugins. Tested with all of Yanfly active.
  *
@@ -131,11 +132,13 @@ Compat.BE = Compat.BE || {};
  *      The leveling system is also still in place with references to it in
  *      windows and everything. This can currently be counteracted by setting
  *      enemy experience gains to 0.
+ * 0.15 Added extremely early support of YEP_VictoryAftermath. Presently it
+ *      will just replace the current EXP screen until I can figure out how
+ *      to make it do a custom screen. It's also ugly.
  */
 //=============================================================================
 
 
-//Our plugin needs to be inside a function:
 (function() {
 
 //=============================================================================
@@ -145,6 +148,7 @@ Compat.BE = Compat.BE || {};
     Compat.Parameters = PluginManager.parameters('StatProg');
     Compat.Param = Compat.Param || {};
     Compat.gparam = Compat.gparam || {};
+    Compat.gparam = Compat.aparam || {};
 
     //Compat.Param. = String(Compat.Parameters['']);
     Compat.Param.Growth = Compat.Param.Growth || {};
@@ -326,53 +330,103 @@ Compat.BE = Compat.BE || {};
     Compat.BE.BattleManager_makeRewards = BattleManager.makeRewards;
     BattleManager.makeRewards = function() {
         Compat.BE.BattleManager_makeRewards.call(this);
+        Compat.aparam = undefined;
+        Compat.aparam = Compat.aparam || {};
+        $gameParty.battleMembers().forEach(function(actor) {
+            Compat.aparam[actor._actorId] = Compat.aparam[actor._actorId] || {};
+
+            if(actor.hpgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.hpgmax - actor.hpgmin + 1) + actor.hpgmin);
+                Compat.aparam[actor._actorId][0] = inc;
+            }
+
+            if(actor.mpgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.mpgmax - actor.mpgmin + 1) + actor.mpgmin);
+                Compat.aparam[actor._actorId][1] = inc;
+            }
+
+            if(actor.atkgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.atkgmax - actor.atkgmin + 1) + actor.atkgmin);
+                Compat.aparam[actor._actorId][2] = inc;
+            }
+
+            if(actor.defgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.defgmax - actor.defgmin + 1) + actor.defgmin);
+                Compat.aparam[actor._actorId][3] = inc;
+            }
+
+            if(actor.matgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.matgmax - actor.matgmin + 1) + actor.matgmin);
+                Compat.aparam[actor._actorId][4] = inc;
+            }
+
+            if(actor.mdfgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.mdfgmax - actor.mdfgmin + 1) + actor.mdfgmin);
+                Compat.aparam[actor._actorId][5] = inc;
+            }
+
+            if(actor.agigr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.agigmax - actor.agigmin + 1) + actor.agigmin);
+                Compat.aparam[actor._actorId][6] = inc;
+            }
+
+            if(actor.lukgr > Math.random()) {
+                var inc = Math.floor(Math.random() * (actor.lukgmax - actor.lukgmin + 1) + actor.lukgmin);
+                Compat.aparam[actor._actorId][7] = inc;
+            }
+
+        }, this);
     };
 
     Compat.BE.BattleManager_gainRewards = BattleManager.gainRewards;
     BattleManager.gainRewards = function() {
         Compat.BE.BattleManager_gainRewards.call(this);
         $gameParty.battleMembers().forEach(function(actor) {
-            if(actor.hpgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.hpgmax - actor.hpgmin + 1) + actor.hpgmin);
-                actor.addParam(0,inc);
-            }
-
-            if(actor.mpgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.mpgmax - actor.mpgmin + 1) + actor.mpgmin);
-                actor.addParam(1,inc);
-            }
-
-            if(actor.atkgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.atkgmax - actor.atkgmin + 1) + actor.atkgmin);
-                actor.addParam(2,inc);
-            }
-
-            if(actor.defgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.defgmax - actor.defgmin + 1) + actor.defgmin);
-                actor.addParam(3,inc);
-            }
-
-            if(actor.matgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.matgmax - actor.matgmin + 1) + actor.matgmin);
-                actor.addParam(4,inc);
-            }
-
-            if(actor.mdfgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.mdfgmax - actor.mdfgmin + 1) + actor.mdfgmin);
-                actor.addParam(5,inc);
-            }
-
-            if(actor.agigr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.agigmax - actor.agigmin + 1) + actor.agigmin);
-                actor.addParam(6,inc);
-            }
-
-            if(actor.lukgr > Math.random()) {
-                var inc = Math.floor(Math.random() * (actor.lukgmax - actor.lukgmin + 1) + actor.lukgmin);
-                actor.addParam(7,inc);
+            if(Compat.aparam[actor._actorId]) {
+                for(var a in Compat.aparam[actor._actorId]) {
+                    actor.addParam(a,Compat.aparam[actor._actorId][a]);
+                }
             }
         }, this);
     };
 
+//=============================================================================
+// Victory Windows
+//=============================================================================
 
+    if(Imported.YEP_VictoryAftermath) {
+
+        Window_VictoryExp.prototype.drawActorGauge = function(actor, index) {
+            var rect = this.gaugeRect(index);
+            this.changeTextColor(this.normalColor());
+            this.drawActorName(actor, rect.x + 2, rect.y);
+            this.drawStats(actor, rect);
+        };
+
+        Window_VictoryExp.prototype.drawStats = function(actor, rect) {
+            var stats = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
+            var yOffset = 0;
+            var xOffset = 128;
+            for(var i = 0; i < 8; i++) {
+                if(Compat.aparam[actor._actorId][i]) {
+                    var temp = actor.param(i) - Compat.aparam[actor._actorId][i];
+                    var str = stats[i] + ": ";
+                    if(i > 1) {
+                        str = str + "   ";
+                    }
+                    str = str + temp + " -> " + actor.param(i);
+                    this.drawText(str, rect.x + xOffset, rect.y + yOffset, rect.width - 4, 'left');
+                    yOffset += 36;
+                }
+
+                if(yOffset == 144) {
+                    yOffset = 0;
+                    xOffset += 300;
+                }
+            }
+        };
+    }
+    else {
+
+    }
 })();
