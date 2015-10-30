@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.20
+// Version: 0.25
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.20 Replace level progression with stat-based progression.
+ * @plugindesc v0.25 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Default HP Growth Max
@@ -113,6 +113,10 @@ Compat.BE = Compat.BE || {};
  * @desc The default amount added to a character's base growth rate per skill use. (0-100)
  * @default 0
  *
+ * @param Base Weapon Growth Rate
+ * @desc The default amount added to a character's base growth rate per weapon use. (0-100)
+ * @default 0
+ *
  * @help
  * ============================================================================
  * Introduction
@@ -129,6 +133,11 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.25  Weapons are now also able to increase the chance of gaining a stat
+ *       in the same way that skills do. Just add:
+ *       <GrowStats: 1,2,3,4,5,6,7,8>
+ *       to the notetags with whatever values you'd like, or set the default
+ *       for all weapons in the plugin parameters.
  * 0.20  Skills can now give an increased chance of gaining specific stats
  *       when they are used in battle. New default parameter added to let 
  *       users set the base increase for all skills (0 for none, 100 for 
@@ -166,6 +175,7 @@ Compat.BE = Compat.BE || {};
     Compat.Param = Compat.Param || {};
     Compat.gparam = Compat.gparam || {};
     Compat.skillparam = [];
+    Compat.weaponparam = [];
     Compat.gparamPlus = []; //Compat.gparamPlus || {};
     Compat.aparam = Compat.aparam || {};
     var stats      = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
@@ -199,6 +209,7 @@ Compat.BE = Compat.BE || {};
     Compat.Param.Growth['lukgmin'] = Number(Compat.Parameters['Default LUK Growth Min']);
     Compat.Param.Growth['lukgr']   = Number(Compat.Parameters['Default LUK Growth Rate']) / 100;
     Compat.Param.SkillGrowthRate   = Number(Compat.Parameters['Base Skill Growth Rate']);
+    Compat.Param.WeaponGrowthRate  = Number(Compat.Parameters['Base Weapon Growth Rate']);
 
 //=============================================================================
 // DataManager
@@ -222,7 +233,7 @@ Compat.BE = Compat.BE || {};
         }
         else if ((data.speed || data.speed == 0) && (data.message1 || data.message1 == "")) { // only skills
             Compat.skillparam[data.id] = [];
-            
+
             for(var k = 0; k < stats.length; k++) {
                 Compat.skillparam[data.id][k] = Compat.Param.SkillGrowthRate;
             }
@@ -233,132 +244,46 @@ Compat.BE = Compat.BE || {};
                 }
             }
         }
+        else if((data.wtypeId || data.wtypeId == 0)) {
+            Compat.weaponparam[data.id] = [];
+
+            for(var k = 0; k < stats.length; k++) {
+                Compat.weaponparam[data.id][k] = Compat.Param.WeaponGrowthRate;
+            }
+            if(data.meta["GrowStats"]) {
+                var x = data.meta["GrowStats"].split(",");
+                for(var i = 0; i < x.length; i++) {
+                    Compat.weaponparam[data.id][i] = parseInt(x[i]);
+                }
+            }
+        }
     };
 
 //=============================================================================
 // BattlerBase
 //=============================================================================
-
-    //growth and min/max stats for HP
-    MVC.reader(Game_BattlerBase.prototype,'hpgr', function(){
-        return this._hpGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'hpgmin', function(){
-        return Compat.gparam[this._actorId]["hpgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'hpgmax', function(){
-        return Compat.gparam[this._actorId]["hpgmax"];
-    });
-
-    Game_BattlerBase.prototype._hpGrowthRate = function() {
-        return Compat.gparam[this._actorId]["hpgr"] + Compat.gparamPlus[this._actorId][0];
-    }
-
-    //growth and min/max stats for MP
-    MVC.reader(Game_BattlerBase.prototype,'mpgr', function(){
-        return this._mpGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'mpgmin', function(){
-        return Compat.gparam[this._actorId]["mpgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'mpgmax', function(){
-        return Compat.gparam[this._actorId]["mpgmax"];
-    });
-
-    Game_BattlerBase.prototype._mpGrowthRate = function() {
-        return Compat.gparam[this._actorId]["mpgr"] + Compat.gparamPlus[this._actorId][1];
-    }
-
-    //growth and min/max stats for ATK
-    MVC.reader(Game_BattlerBase.prototype,'atkgr', function(){
-        return this._atkGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'atkgmin', function(){
-        return Compat.gparam[this._actorId]["atkgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'atkgmax', function(){
-        return Compat.gparam[this._actorId]["atkgmax"];
-    });
-
-    Game_BattlerBase.prototype._atkGrowthRate = function() {
-        return Compat.gparam[this._actorId]["atkgr"] + Compat.gparamPlus[this._actorId][2];
-    }
-
-    //growth and min/max stats for DEF
-    MVC.reader(Game_BattlerBase.prototype,'defgr', function(){
-        return this._defGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'defgmin', function(){
-        return Compat.gparam[this._actorId]["defgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'defgmax', function(){
-        return Compat.gparam[this._actorId]["defgmax"];
-    });
-
-    Game_BattlerBase.prototype._defGrowthRate = function() {
-        return Compat.gparam[this._actorId]["defgr"] + Compat.gparamPlus[this._actorId][3];
-    }
-
-    //growth and min/max stats for MAT
-    MVC.reader(Game_BattlerBase.prototype,'matgr', function(){
-        return this._matGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'matgmin', function(){
-        return Compat.gparam[this._actorId]["matgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'matgmax', function(){
-        return Compat.gparam[this._actorId]["matgmax"];
-    });
-
-    Game_BattlerBase.prototype._matGrowthRate = function() {
-        return Compat.gparam[this._actorId]["matgr"] + Compat.gparamPlus[this._actorId][4];
-    }
-
-    //growth and min/max stats for MDF
-    MVC.reader(Game_BattlerBase.prototype,'mdfgr', function(){
-        return this._mdfGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'mdfgmin', function(){
-        return Compat.gparam[this._actorId]["mdfgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'mdfgmax', function(){
-        return Compat.gparam[this._actorId]["mdfgmax"];
-    });
-
-    Game_BattlerBase.prototype._mdfGrowthRate = function() {
-        return Compat.gparam[this._actorId]["mdfgr"] + Compat.gparamPlus[this._actorId][5];
-    }
-
-    //growth and min/max stats for AGI
-    MVC.reader(Game_BattlerBase.prototype,'agigr', function(){
-        return this._agiGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'agigmin', function(){
-        return Compat.gparam[this._actorId]["agigmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'agigmax', function(){
-        return Compat.gparam[this._actorId]["agigmax"];
-    });
-
-    Game_BattlerBase.prototype._agiGrowthRate = function() {
-        return Compat.gparam[this._actorId]["agigr"] + Compat.gparamPlus[this._actorId][6];
-    }
-
-    //growth and min/max stats for LUK
-    MVC.reader(Game_BattlerBase.prototype,'lukgr', function(){
-        return this._lukGrowthRate();
-    });
-    MVC.reader(Game_BattlerBase.prototype,'lukgmin', function(){
-        return Compat.gparam[this._actorId]["lukgmin"];
-    });
-    MVC.reader(Game_BattlerBase.prototype,'lukgmax', function(){
-        return Compat.gparam[this._actorId]["lukgmax"];
-    });
-
-    Game_BattlerBase.prototype._lukGrowthRate = function() {
-        return Compat.gparam[this._actorId]["lukgr"] + Compat.gparamPlus[this._actorId][7];
+    for(var i = 0; i < statsShort.length; i++) {
+        var key = statsShort[i] + "gr";
+        MVC.reader(Game_BattlerBase.prototype,key, function(){
+            return this._growthRate(key);
+        });
+        key = statsShort[i] + "gmin";
+        MVC.reader(Game_BattlerBase.prototype,key, function(){
+            return Compat.gparam[this._actorId][key];
+        });
+        key = statsShort[i] + "gmax";
+        MVC.reader(Game_BattlerBase.prototype,key, function(){
+            return Compat.gparam[this._actorId][key];
+        });
     }
     
+    Game_BattlerBase.prototype._growthRate = function(key) {
+        var paramId = statsShort.indexOf(key);
+        if(paramId < 0) return 0;
+
+        return Compat.gparam[this._actorId][key] + Compat.gparamPlus[this._actorId][paramId];
+    }
+
     Game_BattlerBase.prototype.getRates = function(paramId) {
         var growth = [];
         if(paramId >= 0 && paramId < 8) {
@@ -391,6 +316,7 @@ Compat.BE = Compat.BE || {};
 
             for(var i = 0; i < 8; i++) {
                 var growthRates = actor.getRates(i);
+
                 if(growthRates[0] > Math.random()) {
                     var inc = Math.floor(Math.random() * (growthRates[1] - growthRates[2] + 1) + growthRates[2]);
                     Compat.aparam[actor._actorId][i] = inc;
@@ -424,9 +350,20 @@ Compat.BE = Compat.BE || {};
         var subject = this.subject();
         if(subject._classId >= 0) {
             var attackSkill = this._item.itemId();
+            var weaponId    = -1;
+            var weapons = subject.weapons();
+            if(weapons) {
+              for(var a in subject.weapons()) {
+                if(subject.weapons()[a].baseItemId)
+                    weaponId = subject.weapons()[a].baseItemId;
+              }
+            }
 
             for(var i = 0; i < stats.length; i++) {
                 Compat.gparamPlus[subject._actorId][i] += (Compat.skillparam[attackSkill][i] / 100);
+                if(weaponId > -1 && this._item.isSkill() && attackSkill == subject.attackSkillId()) {
+                    Compat.gparamPlus[subject._actorId][i] += (Compat.weaponparam[attackSkill][i] / 100);
+                }
             }
         }
     };
