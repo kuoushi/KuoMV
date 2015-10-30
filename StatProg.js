@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.25
+// Version: 0.26
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.25 Replace level progression with stat-based progression.
+ * @plugindesc v0.26 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Default HP Growth Max
@@ -133,6 +133,8 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.26  Found a horrible bug and smashed it. Growth rates now return proper
+ *       values once again.
  * 0.25  Weapons are now also able to increase the chance of gaining a stat
  *       in the same way that skills do. Just add:
  *       <GrowStats: 1,2,3,4,5,6,7,8>
@@ -244,7 +246,7 @@ Compat.BE = Compat.BE || {};
                 }
             }
         }
-        else if((data.wtypeId || data.wtypeId == 0)) {
+        else if((data.wtypeId || data.wtypeId == 0)) {  // only weapons
             Compat.weaponparam[data.id] = [];
 
             for(var k = 0; k < stats.length; k++) {
@@ -262,23 +264,25 @@ Compat.BE = Compat.BE || {};
 //=============================================================================
 // BattlerBase
 //=============================================================================
-    for(var i = 0; i < statsShort.length; i++) {
-        var key = statsShort[i] + "gr";
-        MVC.reader(Game_BattlerBase.prototype,key, function(){
-            return this._growthRate(key);
+    statsShort.forEach(function(stat) {
+        var keygr   = stat + "gr";
+        var keygmin = stat + "gmin";
+        var keygmax = stat + "gmax";
+
+        MVC.reader(Game_BattlerBase.prototype,keygr, function(){
+            return this._growthRate(keygr);
         });
-        key = statsShort[i] + "gmin";
-        MVC.reader(Game_BattlerBase.prototype,key, function(){
-            return Compat.gparam[this._actorId][key];
+        MVC.reader(Game_BattlerBase.prototype,keygmin, function(){
+            return this._growthRate(keygmin);
         });
-        key = statsShort[i] + "gmax";
-        MVC.reader(Game_BattlerBase.prototype,key, function(){
-            return Compat.gparam[this._actorId][key];
+        MVC.reader(Game_BattlerBase.prototype,keygmax, function(){
+            return this._growthRate(keygmax);
         });
-    }
-    
+    });
+
     Game_BattlerBase.prototype._growthRate = function(key) {
-        var paramId = statsShort.indexOf(key);
+        var paramId = Math.max(statsShort.indexOf(key.substr(0,2)),statsShort.indexOf(key.substr(0,3)));
+
         if(paramId < 0) return 0;
 
         return Compat.gparam[this._actorId][key] + Compat.gparamPlus[this._actorId][paramId];
@@ -349,6 +353,7 @@ Compat.BE = Compat.BE || {};
         Compat.BE.Game_Action_apply.call(this, target);
         var subject = this.subject();
         if(subject._classId >= 0) {
+            console.log(subject);
             var attackSkill = this._item.itemId();
             var weaponId    = -1;
             var weapons = subject.weapons();
