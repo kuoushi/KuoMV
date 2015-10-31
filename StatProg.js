@@ -353,7 +353,6 @@ Compat.BE = Compat.BE || {};
         Compat.BE.Game_Action_apply.call(this, target);
         var subject = this.subject();
         if(subject._classId >= 0) {
-            console.log(subject);
             var attackSkill = this._item.itemId();
             var weaponId    = -1;
             var weapons = subject.weapons();
