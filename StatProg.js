@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.26
+// Version: 0.27
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,30 +10,30 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.26 Replace level progression with stat-based progression.
+ * @plugindesc v0.27 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
- * @param Default HP Growth Max
+ * @param Default Max HP Growth Max
  * @desc The default maximum amount for Max HP to increase after battle.
  * @default 20
  *
- * @param Default HP Growth Min
+ * @param Default Max HP Growth Min
  * @desc The default minimum amount for Max HP to increase after battle.
  * @default 5
  *
- * @param Default HP Growth Rate
+ * @param Default Max HP Growth Rate
  * @desc The default chance to increase Max HP after battle. (1-100)
  * @default 25
  *
- * @param Default MP Growth Max
+ * @param Default Max MP Growth Max
  * @desc The default maximum amount for Max MP to increase after battle.
  * @default 20
  *
- * @param Default MP Growth Min
+ * @param Default Max MP Growth Min
  * @desc The default minimum amount for Max MP to increase after battle.
  * @default 5
  *
- * @param Default MP Growth Rate
+ * @param Default Max MP Growth Rate
  * @desc The default chance to increase Max MP after battle. (1-100)
  * @default 25
  *
@@ -133,6 +133,11 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.27  Made the weapon and skill notetags a little bit more flexible so now
+ *       if you want to only modify a single parameter instead and keep the 
+ *       the rest default you can simply say <GrowStat_ATK: 25> to increase the
+ *       character's chance of gaining points in the ATK parameter by 25% at
+ *       the end of battle. Also fixed up some case issues with other notetags.
  * 0.26  Found a horrible bug and smashed it. Growth rates now return proper
  *       values once again.
  * 0.25  Weapons are now also able to increase the chance of gaining a stat
@@ -179,19 +184,19 @@ Compat.BE = Compat.BE || {};
     Compat.skillparam = [];
     Compat.weaponparam = [];
     Compat.gparamPlus = []; //Compat.gparamPlus || {};
-    Compat.aparam = Compat.aparam || {};
+    Compat.aparam = [];
     var stats      = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
     var statsShort = [ "hp", "mp", "atk", "def", "mat", "mdf", "agi", "luk" ];
 
     //Compat.Param. = String(Compat.Parameters['']);
     Compat.Param.Growth = Compat.Param.Growth || {};
 
-    Compat.Param.Growth['hpgmax']  = Number(Compat.Parameters['Default HP Growth Max']);
-    Compat.Param.Growth['hpgmin']  = Number(Compat.Parameters['Default HP Growth Min']);
-    Compat.Param.Growth['hpgr']    = Number(Compat.Parameters['Default HP Growth Rate']) / 100;
-    Compat.Param.Growth['mpgmax']  = Number(Compat.Parameters['Default MP Growth Max']);
-    Compat.Param.Growth['mpgmin']  = Number(Compat.Parameters['Default MP Growth Min']);
-    Compat.Param.Growth['mpgr']    = Number(Compat.Parameters['Default MP Growth Rate']) / 100;
+    Compat.Param.Growth['hpgmax']  = Number(Compat.Parameters['Default Max HP Growth Max']);
+    Compat.Param.Growth['hpgmin']  = Number(Compat.Parameters['Default Max HP Growth Min']);
+    Compat.Param.Growth['hpgr']    = Number(Compat.Parameters['Default Max HP Growth Rate']) / 100;
+    Compat.Param.Growth['mpgmax']  = Number(Compat.Parameters['Default Max MP Growth Max']);
+    Compat.Param.Growth['mpgmin']  = Number(Compat.Parameters['Default Max MP Growth Min']);
+    Compat.Param.Growth['mpgr']    = Number(Compat.Parameters['Default Max MP Growth Rate']) / 100;
     Compat.Param.Growth['atkgmax'] = Number(Compat.Parameters['Default ATK Growth Max']);
     Compat.Param.Growth['atkgmin'] = Number(Compat.Parameters['Default ATK Growth Min']);
     Compat.Param.Growth['atkgr']   = Number(Compat.Parameters['Default ATK Growth Rate']) / 100;
@@ -230,7 +235,7 @@ Compat.BE = Compat.BE || {};
                 if(a.toUpperCase().indexOf("GR") > -1) {
                     b /= 100;
                 }
-                Compat.gparam[data.id][a] = b;
+                Compat.gparam[data.id][a.toLowerCase()] = b;
             }
         }
         else if ((data.speed || data.speed == 0) && (data.message1 || data.message1 == "")) { // only skills
@@ -239,10 +244,20 @@ Compat.BE = Compat.BE || {};
             for(var k = 0; k < stats.length; k++) {
                 Compat.skillparam[data.id][k] = Compat.Param.SkillGrowthRate;
             }
-            if(data.meta["GrowStats"]) {
-                var x = data.meta["GrowStats"].split(",");
-                for(var i = 0; i < x.length; i++) {
-                    Compat.skillparam[data.id][i] = parseInt(x[i]);
+
+            for(var a in data.meta) {
+                if(a.toUpperCase() == "GROWSTATS") {
+                    var x = data.meta[a].split(",");
+                    for(var i = 0; i < x.length; i++) {
+                        Compat.skillparam[data.id][i] = parseInt(x[i]);
+                    }
+                }
+                else if(a.toUpperCase().indexOf("GROWSTAT_") > -1) {
+                    var key = a.substr(9).toLowerCase();
+                    var paramId = statsShort.indexOf(key);
+                    if(paramId > -1) {
+                      Compat.skillparam[data.id][paramId] = parseInt(data.meta[a]);
+                    }
                 }
             }
         }
@@ -252,10 +267,19 @@ Compat.BE = Compat.BE || {};
             for(var k = 0; k < stats.length; k++) {
                 Compat.weaponparam[data.id][k] = Compat.Param.WeaponGrowthRate;
             }
-            if(data.meta["GrowStats"]) {
-                var x = data.meta["GrowStats"].split(",");
-                for(var i = 0; i < x.length; i++) {
-                    Compat.weaponparam[data.id][i] = parseInt(x[i]);
+            for(var a in data.meta) {
+                if(a.toUpperCase() == "GROWSTATS") {
+                    var x = data.meta[a].split(",");
+                    for(var i = 0; i < x.length; i++) {
+                        Compat.weaponparam[data.id][i] = parseInt(x[i]);
+                    }
+                }
+                else if(a.toUpperCase().indexOf("GROWSTAT_") > -1) {
+                    var key = a.substr(9).toLowerCase();
+                    var paramId = statsShort.indexOf(key);
+                    if(paramId > -1) {
+                      Compat.weaponparam[data.id][paramId] = parseInt(data.meta[a]);
+                    }
                 }
             }
         }
@@ -302,6 +326,10 @@ Compat.BE = Compat.BE || {};
         return growth;
     }
     
+    Game_BattlerBase.prototype.addGParamPlus = function(key,val) {
+        Compat.gparamPlus[this._actorId][key] += val;
+    }
+    
     Game_BattlerBase.prototype.clearGParamPlus = function() {
         Compat.gparamPlus[this._actorId] = [ 0,0,0,0,0,0,0,0 ];
     }
@@ -313,10 +341,10 @@ Compat.BE = Compat.BE || {};
     Compat.BE.BattleManager_makeRewards = BattleManager.makeRewards;
     BattleManager.makeRewards = function() {
         Compat.BE.BattleManager_makeRewards.call(this);
-        Compat.aparam = undefined;
+        Compat.aparam = [];
         Compat.aparam = Compat.aparam || {};
         $gameParty.battleMembers().forEach(function(actor) {
-            Compat.aparam[actor._actorId] = []; //Compat.aparam[actor._actorId] || {};
+            Compat.aparam[actor._actorId] = [];
 
             for(var i = 0; i < 8; i++) {
                 var growthRates = actor.getRates(i);
@@ -355,8 +383,8 @@ Compat.BE = Compat.BE || {};
         if(subject._classId >= 0) {
             var attackSkill = this._item.itemId();
             var weaponId    = -1;
-            var weapons = subject.weapons();
-            if(weapons) {
+            if(!subject.hasNoWeapons() && this._item.isSkill() && attackSkill == subject.attackSkillId()) {
+              var weapons = subject.weapons();
               for(var a in subject.weapons()) {
                 if(subject.weapons()[a].baseItemId)
                     weaponId = subject.weapons()[a].baseItemId;
@@ -364,9 +392,9 @@ Compat.BE = Compat.BE || {};
             }
 
             for(var i = 0; i < stats.length; i++) {
-                Compat.gparamPlus[subject._actorId][i] += (Compat.skillparam[attackSkill][i] / 100);
-                if(weaponId > -1 && this._item.isSkill() && attackSkill == subject.attackSkillId()) {
-                    Compat.gparamPlus[subject._actorId][i] += (Compat.weaponparam[attackSkill][i] / 100);
+                subject.addGParamPlus(i,(Compat.skillparam[attackSkill][i] / 100));
+                if(weaponId > -1) {
+                    subject.addGParamPlus(i,(Compat.weaponparam[attackSkill][i] / 100));
                 }
             }
         }
