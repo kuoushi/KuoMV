@@ -1,7 +1,7 @@
 //=============================================================================
 // Custom Stats
 // CustomStats.js
-// Version: 0.05
+// Version: 0.10
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.05 Allows for custom hidden stats that can be used in damage
+ * @plugindesc v0.10 Allows for custom hidden stats that can be used in damage
  * formulas.
  * @author Kuoushi
  *
@@ -32,17 +32,16 @@ Compat.BE = Compat.BE || {};
  * damage formulas and various other places. Simply add them to the plugin
  * parameter in the form of a comma-separated list and they'll be available
  * for use. If you want to give them a custom value then you'll need to create
- * a notetag on each specific class in the form of:
+ * a notetag on each specific actor in the form of:
  *
  * <stat: value>
  * 
  * In the case of the default/example stats that I've included (feel free to
  * remove those, by the way), you could set the custom value for str on a
- * specific class to 5 by going to that class' notes and adding <str: 5>
- * 
- * Currently these stats cannot be changed any other way but I may update
- * this more in the future when the I need more functionality or as demand
- * requires.
+ * specific actor to 5 by going to that actor's notes and adding <str: 5>
+ *
+ * Currently these stats may only be modified by StatProg.js or other plugins
+ * that do not override but do utilize the addParam function from BattlerBase.
  *
  * Warning, EVERYTHING IS CASE SENSITIVE.
  *
@@ -50,6 +49,10 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.10 Plugin is now compatible with my StatProg plugin. You may use any stats
+ *      created in this plugin may be given a growth rate, min and max in
+ *      StatProg. Also, the notetags have moved from the class notetags back to
+ *      actors for consistency.
  * 0.05 Plugin with basic functionality created.
  *
  */
@@ -78,7 +81,7 @@ Compat.BE = Compat.BE || {};
     DataManager.extractMetadata = function(data) {
         extractMetadata.apply(this, arguments);
 
-        if(data.learnings) {  // only classes
+        if(data.classId) {  // only actors
             Compat.cparam[data.id] = [];
             for(i = 0; i < Compat.Param.cStats.length; i++) {
                 Compat.cparam[data.id][Compat.Param.cStats[i]] = Compat.Param.cDefVal;
@@ -100,9 +103,25 @@ Compat.BE = Compat.BE || {};
         });
     });
 
+    Compat.BE.Game_BattlerBase_addParam = Game_BattlerBase.prototype.addParam;
+    Game_BattlerBase.prototype.addParam = function(paramId, value) {
+        if(typeof(paramId) == "number") {
+          Compat.BE.Game_BattlerBase_addParam.call(this, paramId, value);
+          return;
+        }
+        Compat.cparam[this._actorId][paramId] += value;
+    }
+
+    Compat.BE.Game_BattlerBase_param = Game_BattlerBase.prototype.param;
+    Game_BattlerBase.prototype.param = function(paramId) {
+        if(typeof(paramId) == "number") {
+            return Compat.BE.Game_BattlerBase_param.call(this, paramId);
+        }
+        return this._getStat(paramId);
+    };
+
     Game_BattlerBase.prototype._getStat = function(k) {
-        console.log(k);
-        return Compat.cparam[this.currentClass().id][k];
+        return Compat.cparam[this._actorId][k];
     }
 
 })();
