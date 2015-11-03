@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.30
+// Version: 0.31
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.30 Replace level progression with stat-based progression.
+ * @plugindesc v0.31 Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Base Skill Growth Rate
@@ -54,6 +54,7 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.31  Added simple after battle stats gained message.
  * 0.30  Fixed up some dirty code, added in some more dirty code, but overall
  *       a net gain for usability's sake. This version now fully supports my
  *       CustomStats plugin. Other plugins that add stats MIGHT also work with
@@ -351,8 +352,6 @@ Game_ItemGrowth.prototype.getRate = function(key) {
         Compat.BE.BattleManager_makeRewards.call(this);
 
         $gameParty.battleMembers().forEach(function(actor) {
-            Compat.actors[actor._actorId].clearBattleGains();
-
             for(var i = 0; i < statsShort.length; i++) {
                 var growthRates = Compat.actors[actor._actorId].getParam(statsShort[i]);
 
@@ -361,7 +360,6 @@ Game_ItemGrowth.prototype.getRate = function(key) {
                     Compat.actors[actor._actorId].addBattleGains(statsShort[i],inc);
                 }
             }
-            Compat.actors[actor._actorId].clearBattleGrowth();
         }, this);
     };
 
@@ -382,6 +380,15 @@ Game_ItemGrowth.prototype.getRate = function(key) {
               }
             }
         }, this);
+    };
+
+    Compat.BE.BattleManager_endBattle = BattleManager.endBattle;
+    BattleManager.endBattle = function(result) {
+        $gameParty.battleMembers().forEach(function(actor) {
+            Compat.actors[actor._actorId].clearBattleGrowth();
+            Compat.actors[actor._actorId].clearBattleGains();
+        });
+        Compat.BE.BattleManager_endBattle.call(this,result);
     };
 
 
@@ -464,6 +471,16 @@ Game_ItemGrowth.prototype.getRate = function(key) {
         };
     }
     else {
-
+        Compat.BE.BattleManager_displayVictoryMessage = BattleManager.displayVictoryMessage;
+        BattleManager.displayVictoryMessage = function() {
+            Compat.BE.BattleManager_displayVictoryMessage.call(this);
+            $gameParty.battleMembers().forEach(function(actor) {
+                var gains = Compat.actors[actor._actorId].getAllBattleGains();
+                for(var g in gains) {
+                    if(gains[g] > 0)
+                        $gameMessage.add(actor.name() + " gains " + gains[g] + " " + g.toUpperCase() + "!");
+                }
+            });
+        };
     }
 })();
