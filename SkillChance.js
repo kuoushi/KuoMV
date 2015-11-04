@@ -97,89 +97,93 @@ Game_SkillGain.prototype.getAllRates = function() {
     return this._skillRate;
 };
 
-Compat.skillgains = [];
-Compat.weapongains = [];
 
-//=============================================================================
-// Parameter Variables
-//=============================================================================
+(function() {
 
-Compat.Parameters = PluginManager.parameters('SkillChance');
-Compat.Param.DefaultSkillRate = Number(Compat.Parameters['Default Chance']) / 100;
+    Compat.skillgains = [];
+    Compat.weapongains = [];
 
-//=============================================================================
-// DataManager
-//=============================================================================
+    //=============================================================================
+    // Parameter Variables
+    //=============================================================================
 
-var extractMetadata = DataManager.extractMetadata;
-DataManager.extractMetadata = function(data) {
-    extractMetadata.apply(this, arguments);
-    var skill  = (data.speed || data.speed == 0) && (data.message1 || data.message1 == "");
-    var weapon = (data.wtypeId || data.wtypeId == 0);
+    Compat.Parameters = PluginManager.parameters('SkillChance');
+    Compat.Param.DefaultSkillRate = Number(Compat.Parameters['Default Chance']) / 100;
 
-    if(skill || weapon) {
-        var gains = new Game_SkillGain();
-        gains.setItem(data.id);
+    //=============================================================================
+    // DataManager
+    //=============================================================================
 
-        for(var a in data.meta) {
-            if(a.toLowerCase() == "learnchance") {
-                var temp = String(data.meta[a]).trim();
-                temp = temp.split(",");
+    var extractMetadata = DataManager.extractMetadata;
+    DataManager.extractMetadata = function(data) {
+        extractMetadata.apply(this, arguments);
+        var skill  = (data.speed || data.speed == 0) && (data.message1 || data.message1 == "");
+        var weapon = (data.wtypeId || data.wtypeId == 0);
 
-                var val = Compat.Param.DefaultSkillRate;
-                if(temp[1])
-                    val = temp[1] / 100;
-                gains.setRate(temp[0], val);
+        if(skill || weapon) {
+            var gains = new Game_SkillGain();
+            gains.setItem(data.id);
 
-                if(weapon)
-                    Compat.weapongains[data.id] = gains;
-                else
-                    Compat.skillgains[data.id] = gains;
+            for(var a in data.meta) {
+                if(a.toLowerCase() == "learnchance") {
+                    var temp = String(data.meta[a]).trim();
+                    temp = temp.split(",");
+
+                    var val = Compat.Param.DefaultSkillRate;
+                    if(temp[1])
+                        val = temp[1] / 100;
+                    gains.setRate(temp[0], val);
+
+                    if(weapon)
+                        Compat.weapongains[data.id] = gains;
+                    else
+                        Compat.skillgains[data.id] = gains;
+                }
             }
         }
-    }
-};
+    };
 
 
-//=============================================================================
-// BattleManager
-//=============================================================================
+    //=============================================================================
+    // BattleManager
+    //=============================================================================
 
-Compat.BE.BattleManager_processTurn = BattleManager.processTurn;
-BattleManager.processTurn = function() {
-    var subject = this._subject;
-    var action = subject.currentAction();
-    if(subject._actorId && action) {
-        var skill = action.item();
-        var id = skill.id;
-        var gains = null;
-        console.log(skill);
-        if(id != subject.attackSkillId()) {
-            gains = Compat.skillgains;
-        }
-        else {
-            gains = Compat.weapongains;
-            if(!subject.hasNoWeapons()) {
-                var weapons = subject.weapons();
-                for(var a in weapons) {
-                    if(weapons[a].baseItemId) {
-                        id = weapons[a].baseItemId;
+    Compat.BE.BattleManager_processTurn = BattleManager.processTurn;
+    BattleManager.processTurn = function() {
+        var subject = this._subject;
+        var action = subject.currentAction();
+        if(subject._actorId && action) {
+            var skill = action.item();
+            var id = skill.id;
+            var gains = null;
+            if(id != subject.attackSkillId()) {
+                gains = Compat.skillgains;
+            }
+            else {
+                gains = Compat.weapongains;
+                if(!subject.hasNoWeapons()) {
+                    var weapons = subject.weapons();
+                    for(var a in weapons) {
+                        if(weapons[a].baseItemId) {
+                            id = weapons[a].baseItemId;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if(gains[id]) {
+                var rates = gains[id].getAllRates();
+                for(var skillid in rates) {
+                    if(!subject.isLearnedSkill(skillid) && rates[skillid] > Math.random()) {
+                        subject.learnSkill(skillid);
+                        action.setSkill(skillid);
                         break;
                     }
                 }
             }
         }
+        Compat.BE.BattleManager_processTurn.call(this);
+    };
 
-        if(gains[id]) {
-            var rates = gains[id].getAllRates();
-            for(var skillid in rates) {
-                if(!subject.isLearnedSkill(skillid) && rates[skillid] > Math.random()) {
-                    subject.learnSkill(skillid);
-                    action.setSkill(skillid);
-                    break;
-                }
-            }
-        }
-    }
-    Compat.BE.BattleManager_processTurn.call(this);
-};
+})();
