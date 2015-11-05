@@ -35,16 +35,12 @@
  * even further convenience. The fade will start on whatever your character's
  * current opacity is set at.
  *
- * I *think* the Options from the bottom left of the Movement Route editor will
- * be saved but the route will end when this script is done. I'll see what I
- * can do about preserving the rest of the route in a future update, but for
- * now please use the fade as your very last step in your route or in its own
- * separate set movement route event line.
- *
  * ============================================================================
  * Changelog
  * ============================================================================
  *
+ * 1.01   Fixed the issue which required the call to be at the end of the
+ *        route list. Now it can be called in any location in a movement route.
  * 1.00   Plugin with basic functionality created.
  *
  */
@@ -72,7 +68,7 @@
         var step = Math.ceil(this._opacity / time);
 
 
-        for(i = this._opacity; i > -1; i -= step) {
+        for(var i = this._opacity; i > -1; i -= step) {
             var command = new Object();
             command.code = Game_Character.ROUTE_CHANGE_OPACITY;
             command.parameters = [i];
@@ -86,11 +82,8 @@
             }
         }
 
-        var endcall = {};
-        endcall.code = 0;
-        route.list.push(endcall);
-
-        this._moveRoute = route;
+        route.list = this._moveRoute.list.slice(0,this._moveRouteIndex).concat(route.list).concat(this._moveRoute.list.slice(this._moveRouteIndex+1));
+        this._moveRoute.list = route.list;
     };
     
     Game_CharacterBase.prototype.fadeIn = function(numFrames) {
@@ -109,7 +102,7 @@
     
         var step = Math.ceil((255 - this._opacity) / time);
         
-        for(i = this._opacity; i < 256; i += step) {
+        for(var i = this._opacity; i < 256; i += step) {
             var command = new Object();
             command.code = Game_Character.ROUTE_CHANGE_OPACITY;
             command.parameters = [i];
@@ -123,10 +116,7 @@
             }
         }
     
-        var endcall = {};
-        endcall.code = 0;
-        route.list.push(endcall);
-    
-        this._moveRoute = route;
+        route.list = this._moveRoute.list.slice(0,this._moveRouteIndex).concat(route.list).concat(this._moveRoute.list.slice(this._moveRouteIndex+1));
+        this._moveRoute.list = route.list;
     };
 })();
