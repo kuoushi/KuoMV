@@ -1,7 +1,7 @@
 //=============================================================================
 // Skill Chance
 // SkillChance.js
-// Version: 0.10
+// Version: 0.11
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,13 +10,18 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.10 Allows characters to learn skills in battle by using other
+ * @plugindesc v0.11 Allows characters to learn skills in battle by using other
  *                   weapons or skills.
  * @author Kuoushi
  *
  * @param Default Chance
  * @desc Default chance for a skill to proc if not specified.
  * @default 25
+ * 
+ * @param Consume On Learn
+ * @desc Toggles whether or not HP/MP/TP will be consumed when a new skill is
+ *       learned. (0 = OFF, 1 = ON)
+ * @default 0
  *
  * @help
  * ============================================================================
@@ -54,6 +59,9 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.11   Added Consume on Learn plugin parameter which allows you to set
+ *        whether or not a skill will use HP/MP/TP the moment it is learned and
+ *        first used in battle.
  * 0.10   Plugin with basic functionality created.
  *
  */
@@ -102,17 +110,19 @@ Game_SkillGain.prototype.getAllRates = function() {
 
     Compat.skillgains = [];
     Compat.weapongains = [];
+    Compat.learned = false;
 
-    //=============================================================================
-    // Parameter Variables
-    //=============================================================================
+//=============================================================================
+// Parameter Variables
+//=============================================================================
 
     Compat.Parameters = PluginManager.parameters('SkillChance');
     Compat.Param.DefaultSkillRate = Number(Compat.Parameters['Default Chance']) / 100;
+    Compat.Param.ConsumeOnLearn   = Compat.Parameters['Consume On Learn'];
 
-    //=============================================================================
-    // DataManager
-    //=============================================================================
+//=============================================================================
+// DataManager
+//=============================================================================
 
     var extractMetadata = DataManager.extractMetadata;
     DataManager.extractMetadata = function(data) {
@@ -140,13 +150,14 @@ Game_SkillGain.prototype.getAllRates = function() {
                         Compat.skillgains[data.id] = gains;
                 }
             }
+            data.gains = gains;
         }
     };
 
 
-    //=============================================================================
-    // BattleManager
-    //=============================================================================
+//=============================================================================
+// BattleManager
+//=============================================================================
 
     Compat.BE.BattleManager_processTurn = BattleManager.processTurn;
     BattleManager.processTurn = function() {
@@ -178,12 +189,25 @@ Game_SkillGain.prototype.getAllRates = function() {
                     if(!subject.isLearnedSkill(skillid) && rates[skillid] > Math.random()) {
                         subject.learnSkill(skillid);
                         action.setSkill(skillid);
+                        Compat.learned = true;
                         break;
                     }
                 }
             }
         }
         Compat.BE.BattleManager_processTurn.call(this);
+    };
+
+//=============================================================================
+// Game_Battler
+//=============================================================================
+
+    Compat.BE.Game_Battler_useItem = Game_Battler.prototype.useItem;
+    Game_Battler.prototype.useItem = function(item) {
+        if(!Compat.Param.ConsumeOnLearn || !Compat.learned) {
+            Compat.BE.Game_Battler_useItem.call(this,item);
+        }
+        Compat.learned = false;
     };
 
 })();
