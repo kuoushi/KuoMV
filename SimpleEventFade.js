@@ -1,17 +1,17 @@
 //=============================================================================
 // Simple Event Fade
 // SimpleEventFade.js
-// Version: 0.10
+// Version: 1.1
 // Author: Kuoushi
 //=============================================================================
 
 //=============================================================================
  /*:
- * @plugindesc v1.0 Makes fading events in or out easier.
+ * @plugindesc v1.1 Makes fading events in or out easier.
  * @author Kuoushi
  *
  * @param Default Fade Time
- * @desc The default number of frames to fade an event in or out.
+ * @desc The default number of frames to fade an event in or out. (1 - 255)
  * @default 30
  *
  * @help
@@ -39,6 +39,10 @@
  * Changelog
  * ============================================================================
  *
+ * 1.1    Fixed possible bug where we didn't move the moveroute index back
+ *        after splicing in the new fade commands. Also added in a new fadeTo
+ *        command that'll allow you to fade to a specific opacity instead of
+ *        just in or out.
  * 1.01   Fixed the issue which required the call to be at the end of the
  *        route list. Now it can be called in any location in a movement route.
  * 1.00   Plugin with basic functionality created.
@@ -52,71 +56,50 @@
     var DefaultFadeTime = Number(Parameters['Default Fade Time']);
 
     Game_CharacterBase.prototype.fadeOut = function(numFrames) {
-        var time = DefaultFadeTime;
-        if(numFrames)
-            time = numFrames;
-
-        var route = {};
-        route.repeat = this._moveRoute.repeat;
-        route.skippable = this._moveRoute.skippable;
-        route.wait = this._moveRoute.wait;
-        route.list = [];
-        var waitObj = {};
-        waitObj.code = Game_Character.ROUTE_WAIT;
-        waitObj.parameters = [1];
-
-        var step = Math.ceil(this._opacity / time);
-
-
-        for(var i = this._opacity; i > -1; i -= step) {
-            var command = new Object();
-            command.code = Game_Character.ROUTE_CHANGE_OPACITY;
-            command.parameters = [i];
-            route.list.push(command);
-            route.list.push(waitObj);
-            if(i != 0 && (i - step) < 0) {
-                var last = new Object();
-                last.code = Game_Character.ROUTE_CHANGE_OPACITY;
-                last.parameters = [0];
-                route.list.push(last);
-            }
-        }
-
-        route.list = this._moveRoute.list.slice(0,this._moveRouteIndex).concat(route.list).concat(this._moveRoute.list.slice(this._moveRouteIndex+1));
-        this._moveRoute.list = route.list;
+        this.fadeTo(0,numFrames);
     };
-    
+
     Game_CharacterBase.prototype.fadeIn = function(numFrames) {
+        this.fadeTo(255,numFrames);
+    };
+
+    Game_CharacterBase.prototype.fadeTo = function(fadeOpac, numFrames) {
         var time = DefaultFadeTime;
         if(numFrames)
             time = numFrames;
 
         var route = {};
-        route.repeat = this._moveRoute.repeat;
-        route.skippable = this._moveRoute.skippable;
-        route.wait = this._moveRoute.wait;
         route.list = [];
         var waitObj = {};
         waitObj.code = Game_Character.ROUTE_WAIT;
         waitObj.parameters = [1];
-    
-        var step = Math.ceil((255 - this._opacity) / time);
+
+        var step = (fadeOpac - this._opacity) / time;
         
-        for(var i = this._opacity; i < 256; i += step) {
+        if(step < 0)
+            step = Math.ceil(Math.abs(step)) * -1;
+        else
+            step = Math.ceil(step);
+
+        for(var i = this._opacity; i != fadeOpac; i += step) {
             var command = new Object();
             command.code = Game_Character.ROUTE_CHANGE_OPACITY;
             command.parameters = [i];
             route.list.push(command);
             route.list.push(waitObj);
-            if(i != 255 && (i + step) > 255) {
-                var last = new Object();
-                last.code = Game_Character.ROUTE_CHANGE_OPACITY;
-                last.parameters = [255];
-                route.list.push(last);
+            if(i != fadeOpac) {
+                if((step > 0 && (i + step) > fadeOpac) || (step < 0 && (i + step) < fadeOpac)) {
+                    var last = new Object();
+                    last.code = Game_Character.ROUTE_CHANGE_OPACITY;
+                    last.parameters = [fadeOpac];
+                    route.list.push(last);
+                    i = fadeOpac - step;
+                }
             }
         }
-    
+
         route.list = this._moveRoute.list.slice(0,this._moveRouteIndex).concat(route.list).concat(this._moveRoute.list.slice(this._moveRouteIndex+1));
         this._moveRoute.list = route.list;
+        this._moveRouteIndex--;
     };
 })();
