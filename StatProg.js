@@ -1,7 +1,7 @@
 //=============================================================================
 // Stat-based Progression System
 // StatProg.js
-// Version: 0.31
+// Version: 0.31a
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.31 Replace level progression with stat-based progression.
+ * @plugindesc v0.31a Replace level progression with stat-based progression.
  * @author Kuoushi
  *
  * @param Base Skill Growth Rate
@@ -54,13 +54,14 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.31a Code cleanup. Removed redundant storage of values.
  * 0.31  Added simple after battle stats gained message.
  * 0.30  Fixed up some dirty code, added in some more dirty code, but overall
  *       a net gain for usability's sake. This version now fully supports my
  *       CustomStats plugin. Other plugins that add stats MIGHT also work with
  *       this depending on how the stats themselves are implemented.
  * 0.27  Made the weapon and skill notetags a little bit more flexible so now
- *       if you want to only modify a single parameter instead and keep the 
+ *       if you want to only modify a single parameter instead and keep the
  *       the rest default you can simply say <GrowStat_ATK: 25> to increase the
  *       character's chance of gaining points in the ATK parameter by 25% at
  *       the end of battle. Also fixed up some case issues with other notetags.
@@ -72,8 +73,8 @@ Compat.BE = Compat.BE || {};
  *       to the notetags with whatever values you'd like, or set the default
  *       for all weapons in the plugin parameters.
  * 0.20  Skills can now give an increased chance of gaining specific stats
- *       when they are used in battle. New default parameter added to let 
- *       users set the base increase for all skills (0 for none, 100 for 
+ *       when they are used in battle. New default parameter added to let
+ *       users set the base increase for all skills (0 for none, 100 for
  *       certain skill increase.) Skill notetags are required at the moment
  *       for each skill unless you want them all to have the base gain chance.
  *       <GrowStats: 1,2,3,4,5,6,7,8> is the current format. All numbers are
@@ -96,23 +97,6 @@ Compat.BE = Compat.BE || {};
  *       enemy experience gains to 0.
  */
 //=============================================================================
-
-//=============================================================================
-// Game_GrowthRates - Contains all of our growth stats
-//=============================================================================
-/*
-function Game_GrowthRates() {
-    this.initialize.apply(this, arguments);
-}
-
-Game_GrowthRates.prototype.initialize = function() {
-    this.initRates();
-};
-
-Game_GrowthRates.prototype.initRates = function() {
-
-}
-*/
 
 //=============================================================================
 // Game_ActorGrowth - Contains rates for a single actor
@@ -254,12 +238,6 @@ Game_ItemGrowth.prototype.getRate = function(key) {
     var stats      = [ "Max HP", "Max MP", "ATK", "DEF", "MAT", "MDF", "AGI", "LUK" ];
     var statsShort = [ "hp", "mp", "atk", "def", "mat", "mdf", "agi", "luk" ];
 
-    // growth object arrays
-    Compat.actors  = [];
-    Compat.weapons = [];
-    Compat.skills  = [];
-
-    //Compat.Param. = String(Compat.Parameters['']);
     Compat.Param.Growth = Compat.Param.Growth || {};
 
     Compat.Param.Default          = [];
@@ -295,7 +273,7 @@ Game_ItemGrowth.prototype.getRate = function(key) {
             for(var a in data.meta) {  // only actors
                 var b = parseInt(data.meta[a]);
                 if(a.toLowerCase().substr(-2) == "gr") {
-                    b /= 100;
+                    b = parseFloat(data.meta[a]) / 100;
                     var key = a.toLowerCase().substr(0,a.length - 2);
                     actorRates.setRate(key, b);
                 }
@@ -308,7 +286,7 @@ Game_ItemGrowth.prototype.getRate = function(key) {
                     actorRates.setMin(key,b);
                 }
             }
-            Compat.actors[data.id] = actorRates;
+            data.growth = actorRates;
         }
         else {
             var skill  = (data.speed || data.speed == 0) && (data.message1 || data.message1 == "");
@@ -326,18 +304,16 @@ Game_ItemGrowth.prototype.getRate = function(key) {
                     if(a.toLowerCase() == "growstats") {
                         var x = data.meta[a].split(",");
                         for(var i = 0; i < x.length; i++) {
-                            rates.setRate(statsShort[i],parseInt(x[i]));
+                            rates.setRate(statsShort[i],parseFloat(x[i]));
                         }
                     }
                     else if(a.toLowerCase().indexOf("growstat_") > -1) {
                         var key = a.substr(9).toLowerCase();
-                        rates.setRate(key, parseInt(data.meta[a]));
+                        rates.setRate(key, parseFloat(data.meta[a]));
                     }
                 }
-                if(weapon)
-                    Compat.weapons[data.id] = rates;
-                else
-                    Compat.skills[data.id] = rates;
+
+                data.growth = rates;
             }
         }
     };
@@ -353,11 +329,11 @@ Game_ItemGrowth.prototype.getRate = function(key) {
 
         $gameParty.battleMembers().forEach(function(actor) {
             for(var i = 0; i < statsShort.length; i++) {
-                var growthRates = Compat.actors[actor._actorId].getParam(statsShort[i]);
+                var growthRates = actor._growth.getParam(statsShort[i]);
 
                 if(growthRates['rate'] > Math.random()) {
                     var inc = Math.floor(Math.random() * (growthRates['max'] - growthRates['min'] + 1) + growthRates['min']);
-                    Compat.actors[actor._actorId].addBattleGains(statsShort[i],inc);
+                    actor._growth.addBattleGains(statsShort[i],inc);
                 }
             }
         }, this);
@@ -367,7 +343,7 @@ Game_ItemGrowth.prototype.getRate = function(key) {
     BattleManager.gainRewards = function() {
         Compat.BE.BattleManager_gainRewards.call(this);
         $gameParty.battleMembers().forEach(function(actor) {
-            gains = Compat.actors[actor._actorId].getAllBattleGains();
+            gains = actor._growth.getAllBattleGains();
             for(var a in gains) {
               var key = statsShort.indexOf(a);
 
@@ -385,8 +361,8 @@ Game_ItemGrowth.prototype.getRate = function(key) {
     Compat.BE.BattleManager_endBattle = BattleManager.endBattle;
     BattleManager.endBattle = function(result) {
         $gameParty.battleMembers().forEach(function(actor) {
-            Compat.actors[actor._actorId].clearBattleGrowth();
-            Compat.actors[actor._actorId].clearBattleGains();
+            actor._growth.clearBattleGrowth();
+            actor._growth.clearBattleGains();
         });
         Compat.BE.BattleManager_endBattle.call(this,result);
     };
@@ -401,23 +377,35 @@ Game_ItemGrowth.prototype.getRate = function(key) {
         Compat.BE.Game_Action_apply.call(this, target);
         var subject = this.subject();
         if(subject._classId >= 0) {
-            var attackSkill = this._item.itemId();
+            var skillId = this._item.itemId();
             var weaponId    = -1;
-            if(!subject.hasNoWeapons() && this._item.isSkill() && attackSkill == subject.attackSkillId()) {
+            if(!subject.hasNoWeapons() && this._item.isSkill() && skillId == subject.attackSkillId()) {
                 var weapons = subject.weapons();
-                for(var a in subject.weapons()) {
-                    if(subject.weapons()[a].baseItemId)
-                        weaponId = subject.weapons()[a].baseItemId;
+                for(var a in weapons) {
+                    if(weapons[a].baseItemId) {
+                        weaponId = weapons[a].baseItemId;
+                        break;
+                    }
                 }
             }
 
             for(var i = 0; i < stats.length; i++) {
-                Compat.actors[subject._actorId].addRate(statsShort[i],Compat.skills[attackSkill].getRate(statsShort[i]) / 100);
+                subject._growth.addRate(statsShort[i],$dataSkills[skillId].growth.getRate(statsShort[i]) / 100);
                 if(weaponId > -1) {
-                    Compat.actors[subject._actorId].addRate(statsShort[i],(Compat.weapons[weaponId].getRate(statsShort[i]) / 100));
+                    subject._growth.addRate(statsShort[i],($dataWeapons[weaponId].growth.getRate(statsShort[i]) / 100));
                 }
             }
         }
+    };
+
+//=============================================================================
+// Game_Actor
+//=============================================================================
+
+    Compat.BE.Game_Actor_setup = Game_Actor.prototype.setup;
+    Game_Actor.prototype.setup = function(actorId) {
+        Compat.BE.Game_Actor_setup.call(this, actorId);
+        this._growth = $dataActors[actorId].growth;
     };
 
 //=============================================================================
@@ -437,7 +425,7 @@ Game_ItemGrowth.prototype.getRate = function(key) {
             var yOffset = 0;
             var xOffset = 128;
             for(var i = 0; i < statsShort.length; i++) {
-                var gains = Compat.actors[actor._actorId].getBattleGains(statsShort[i]);
+                var gains = actor._growth.getBattleGains(statsShort[i]);
                 if(gains && gains > 0) {
                     var temp = 0;
 
@@ -475,10 +463,20 @@ Game_ItemGrowth.prototype.getRate = function(key) {
         BattleManager.displayVictoryMessage = function() {
             Compat.BE.BattleManager_displayVictoryMessage.call(this);
             $gameParty.battleMembers().forEach(function(actor) {
-                var gains = Compat.actors[actor._actorId].getAllBattleGains();
+                var gains = actor._growth.getAllBattleGains();
+                var initial = true;
                 for(var g in gains) {
-                    if(gains[g] > 0)
-                        $gameMessage.add(actor.name() + " gains " + gains[g] + " " + g.toUpperCase() + "!");
+                    if(gains[g] > 0) {
+                        if(initial) {
+                            $gameMessage.add(actor.name() + "'s stats have increased!");
+                            initial = false;
+                        }
+                        var paramId = statsShort.indexOf(g.toLowerCase());
+                        var statName = $dataSystem.terms.params[paramId];
+                        if(paramId > 7)
+                            statName = g.toUpperCase();
+                        $gameMessage.add(statName + "+" + gains[g]);
+                    }
                 }
             });
         };
