@@ -1,7 +1,7 @@
 //=============================================================================
 // Custom Stats
 // CustomStats.js
-// Version: 0.10.1
+// Version: 0.10.2
 // Author: Kuoushi
 //=============================================================================
 
@@ -10,7 +10,7 @@ Compat.BE = Compat.BE || {};
 
 //=============================================================================
  /*:
- * @plugindesc v0.10.1 Allows for custom hidden stats that can be used in damage
+ * @plugindesc v0.10.2 Allows for custom hidden stats that can be used in damage
  * formulas.
  * @author Kuoushi
  *
@@ -49,6 +49,7 @@ Compat.BE = Compat.BE || {};
  * Changelog
  * ============================================================================
  *
+ * 0.10.2 Code cleanup. Replaced unnecessary plugin variable storage.
  * 0.10.1 Small bugfix to fix stats saving and loading properly.
  * 0.10   Plugin is now compatible with my StatProg plugin. You may use any stats
  *        created in this plugin may be given a growth rate, min and max in
@@ -68,7 +69,6 @@ Compat.BE = Compat.BE || {};
 
     Compat.Parameters = PluginManager.parameters('CustomStats');
     Compat.Param      = Compat.Param || {};
-    Compat.cparam     = [];
 
     Compat.Param.cStats  = String(Compat.Parameters['Custom Stats']).trim();
     Compat.Param.cStats  = Compat.Param.cStats.split(",");
@@ -83,17 +83,18 @@ Compat.BE = Compat.BE || {};
         extractMetadata.apply(this, arguments);
 
         if(data.classId) {  // only actors
-            Compat.cparam[data.id] = [];
+            var cparams = [];
             for(i = 0; i < Compat.Param.cStats.length; i++) {
-                Compat.cparam[data.id][Compat.Param.cStats[i]] = Compat.Param.cDefVal;
+                cparams[Compat.Param.cStats[i]] = Compat.Param.cDefVal;
             }
 
             for(var a in data.meta) {
                 if(Compat.Param.cStats.indexOf(a.toLowerCase()) > -1) {
                   var val = parseInt(data.meta[a]);
-                  Compat.cparam[data.id][a] = val;
+                  cparams[a] = val;
                 }
             }
+            data.cparams = cparams;
         }
     };
 
@@ -119,13 +120,19 @@ Compat.BE = Compat.BE || {};
     };
 
 //=============================================================================
-// BattlerBase
+// Game_BattlerBase
 //=============================================================================
     Compat.Param.cStats.forEach(function(key) {
         MVC.reader(Game_BattlerBase.prototype,key, function(){
-            return this._getStat(key);
+            return this._cparam[key];
         });
     });
+    
+    Compat.BE.Game_BattlerBase_initMembers = Game_BattlerBase.prototype.initMembers;
+    Game_BattlerBase.prototype.initMembers = function() {
+        Compat.BE.Game_BattlerBase_initMembers.call(this);
+        this._cparam = [];
+    };
 
     Compat.BE.Game_BattlerBase_addParam = Game_BattlerBase.prototype.addParam;
     Game_BattlerBase.prototype.addParam = function(paramId, value) {
@@ -133,7 +140,7 @@ Compat.BE = Compat.BE || {};
           Compat.BE.Game_BattlerBase_addParam.call(this, paramId, value);
           return;
         }
-        Compat.cparam[this._actorId][paramId] += value;
+        this._cparam[paramId] += value;
     }
 
     Compat.BE.Game_BattlerBase_param = Game_BattlerBase.prototype.param;
@@ -141,11 +148,17 @@ Compat.BE = Compat.BE || {};
         if(typeof(paramId) == "number") {
             return Compat.BE.Game_BattlerBase_param.call(this, paramId);
         }
-        return this._getStat(paramId);
+        return this._cparam[paramId];
     };
 
-    Game_BattlerBase.prototype._getStat = function(k) {
-        return Compat.cparam[this._actorId][k];
-    }
+//=============================================================================
+// Game_Actor
+//=============================================================================
+
+    Compat.BE.Game_Actor_setupTwo = Game_Actor.prototype.setup;
+    Game_Actor.prototype.setup = function(actorId) {
+        Compat.BE.Game_Actor_setupTwo.call(this, actorId);
+        this._cparam = $dataActors[actorId].cparams;
+    };
 
 })();
