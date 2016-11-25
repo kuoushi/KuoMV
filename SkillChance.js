@@ -137,8 +137,8 @@ Game_SkillGain.prototype.getAllRates = function() {
 //=============================================================================
 
     Compat.Parameters = PluginManager.parameters('SkillChance');
-    Compat.Param.DefaultSkillRate = Number(Compat.Parameters['Default Chance']) / 100;
-    Compat.Param.ConsumeOnLearn   = Compat.Parameters['Consume On Learn'];
+    Compat.BE.DefaultSkillRate = Number(Compat.Parameters['Default Chance']) / 100;
+    Compat.BE.ConsumeOnLearn   = Compat.Parameters['Consume On Learn'];
 
 //=============================================================================
 // DataManager
@@ -173,7 +173,7 @@ Game_SkillGain.prototype.getAllRates = function() {
                     for (var i = 0; i < temp.length; i++) {
                         var val = temp[i];
                         if(val == "" || val == " " || val == "-1") {
-                            val = Compat.Param.DefaultSkillRate;
+                            val = Compat.BE.DefaultSkillRate;
                         }
                         else {
                             val = val / 100;
@@ -184,7 +184,7 @@ Game_SkillGain.prototype.getAllRates = function() {
                 }
             }
             for(var j = 0; j < learnIds.length; j++) {
-                var val = Compat.Param.DefaultSkillRate;
+                var val = Compat.BE.DefaultSkillRate;
                 if(learnRates[j]) {
                     val = learnRates[j];
                 }
@@ -229,7 +229,6 @@ Game_SkillGain.prototype.getAllRates = function() {
 
             if(gains[id]) {
                 var rates = gains[id].getAllRates();
-                console.log(rates);
                 for(var skillid in rates) {
                     var rand = Math.random();
                     if(!subject.isLearnedSkill(skillid) && rates[skillid] > rand) {
@@ -250,7 +249,7 @@ Game_SkillGain.prototype.getAllRates = function() {
 
     Compat.BE.Game_Battler_useItem = Game_Battler.prototype.useItem;
     Game_Battler.prototype.useItem = function(item) {
-        if(!Compat.Param.ConsumeOnLearn || !Compat.learned) {
+        if(!Compat.BE.ConsumeOnLearn || !Compat.learned) {
             Compat.BE.Game_Battler_useItem.call(this,item);
         }
         Compat.learned = false;
@@ -259,7 +258,7 @@ Game_SkillGain.prototype.getAllRates = function() {
     Compat.BE.Window_BattleLog_startAction = Window_BattleLog.prototype.startAction;
     Window_BattleLog.prototype.startAction = function(subject, action, targets) {
        if(Compat.learned) {
-           console.log(subject);
+//           console.log(subject);
            this.push('showLearnedBalloon', subject);
            this.push('waitForMovement');
        }
@@ -267,6 +266,6 @@ Game_SkillGain.prototype.getAllRates = function() {
     };
 
     Window_BattleLog.prototype.showLearnedBalloon = function(subject) {
-        console.log(subject);
+//        console.log(subject);
     };
 })();
