@@ -37,28 +37,48 @@ Compat.BE = Compat.BE || {};
  * it be available permanently from then on.
  *
  * Notetags are required in order to use this plugin. Each weapon or skill will
- * need a <LearnChance: skillid,chance> notetag where skillid is the ID of the 
- * skill you wish to be learnable and chance is the percent (0-100) chance of
+ * need a <LearnChance: skillid,skillid2,...> notetag where skillid is the ID of the
+ * skill you wish to be learnable and chance to learn is determined in the <LearnRate:
+ * skillrate1,skillrate2,...> tag, where skillrate is the percent (0-100) chance of
  * learning that skill with every use. For example, if you wish to give a sword
  * a 5% chance to learn double slash every time a regular attack is used, you'd
  * go to the sword's item entry in the weapons tab in your database and add the
  * notetag:
  *
- * <LearnChance: 4,5>
+ * <LearnChance: 4>
+ * <LearnRate: 5>
  *
  * That is, of course, assuming you have a skill named double slash in spot 4
  * in your skills tab. You can also use the default learn chance specified in
- * the parameters by simply dropping the chance in the notetag like so:
+ * the parameters by simply dropping the rate notetag like so:
  *
  * <LearnChance: 4>
  *
  * The default attack skill will use weapon notetags only, while all other
  * skills will use the skill notetags.
  *
+ * For more advanced learning branches of sorts, you'll need to add more skills
+ * to each weapon or skill notetag. For instance, say you want to have a sword
+ * that has a chance to learn 5 different skills with differing rates, you'd
+ * need to set up your notetags like follows:
+ *
+ * <LearnChance: 4,6,9,12,41>
+ * <LearnRate: 5,3,,2,0.1>
+ *
+ * Note how every skill is represented in both notetags. In this instance, skill
+ * 9 has a "blank" spot. This indicates to the script that you want to use the
+ * default rate defined in the plugin settings. You can also put a " " space, or
+ * a -1 to signify the same thing. Another thing to note is that for learning 
+ * skill 41, I put a 0.1. This means 0.1%. You can go as far down as you want
+ * in general.
+ *
  * ============================================================================
  * Changelog
  * ============================================================================
  *
+ * 0.12   Fixed bug with the script not supporting learning multiple skills
+ *        from a single weapon or skill. Notetags are updated accordingly and
+ *        it should work fine now.
  * 0.11   Added Consume on Learn plugin parameter which allows you to set
  *        whether or not a skill will use HP/MP/TP the moment it is learned and
  *        first used in battle.
@@ -134,23 +154,47 @@ Game_SkillGain.prototype.getAllRates = function() {
             var gains = new Game_SkillGain();
             gains.setItem(data.id);
 
+            var learnIds   = [];
+            var learnRates = [];
+
             for(var a in data.meta) {
                 if(a.toLowerCase() == "learnchance") {
                     var temp = String(data.meta[a]).trim();
                     temp = temp.split(",");
 
-                    var val = Compat.Param.DefaultSkillRate;
-                    if(temp[1])
-                        val = temp[1] / 100;
-                    gains.setRate(temp[0], val);
+                    for (var i = 0; i < temp.length; i++) {
+                        learnIds.push(temp[i]);
+                    }
+                }
+                else if(a.toLowerCase() == "learnrate") {
+                    var temp = String(data.meta[a]).trim();
+                    temp = temp.split(",");
 
-                    if(weapon)
-                        Compat.weapongains[data.id] = gains;
-                    else
-                        Compat.skillgains[data.id] = gains;
+                    for (var i = 0; i < temp.length; i++) {
+                        var val = temp[i];
+                        if(val == "" || val == " " || val == "-1") {
+                            val = Compat.Param.DefaultSkillRate;
+                        }
+                        else {
+                            val = val / 100;
+                        }
+
+                        learnRates.push(val);
+                    }
                 }
             }
+            for(var j = 0; j < learnIds.length; j++) {
+                var val = Compat.Param.DefaultSkillRate;
+                if(learnRates[j]) {
+                    val = learnRates[j];
+                }
+                gains.setRate(learnIds[j],val);
+            }
             data.gains = gains;
+            if(weapon)
+                Compat.weapongains[data.id] = gains;
+            else
+                Compat.skillgains[data.id] = gains;
         }
     };
 
@@ -185,8 +229,10 @@ Game_SkillGain.prototype.getAllRates = function() {
 
             if(gains[id]) {
                 var rates = gains[id].getAllRates();
+                console.log(rates);
                 for(var skillid in rates) {
-                    if(!subject.isLearnedSkill(skillid) && rates[skillid] > Math.random()) {
+                    var rand = Math.random();
+                    if(!subject.isLearnedSkill(skillid) && rates[skillid] > rand) {
                         subject.learnSkill(skillid);
                         action.setSkill(skillid);
                         Compat.learned = true;
@@ -210,4 +256,17 @@ Game_SkillGain.prototype.getAllRates = function() {
         Compat.learned = false;
     };
 
+    Compat.BE.Window_BattleLog_startAction = Window_BattleLog.prototype.startAction;
+    Window_BattleLog.prototype.startAction = function(subject, action, targets) {
+       if(Compat.learned) {
+           console.log(subject);
+           this.push('showLearnedBalloon', subject);
+           this.push('waitForMovement');
+       }
+       Compat.BE.Window_BattleLog_startAction.call(this, subject, action, targets);
+    };
+
+    Window_BattleLog.prototype.showLearnedBalloon = function(subject) {
+        console.log(subject);
+    };
 })();
